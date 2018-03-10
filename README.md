@@ -1,6 +1,6 @@
-# ce-issues-calendar
+# Campus Expert Calendar
 
-> a GitHub App built with [probot](https://github.com/probot/probot) that 
+A [probot](https://github.com/probot/probot) GitHub App that reads events from issues and adds them to a Google Calendar.
 
 ## Setup
 
@@ -12,4 +12,10 @@ npm install
 npm start
 ```
 
-See [docs/deploy.md](docs/deploy.md) if you would like to run your own instance of this app.
+Required GitHub App permissions:
+
+* Issues: read & write
+* Single file: read-only, path: `.github/calendar.yml`
+* Events: Issues, Issue comment
+
+More info [here](https://probot.github.io/docs/deployment/).
