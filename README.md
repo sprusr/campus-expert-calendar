@@ -1,6 +1,8 @@
-# Campus Expert Calendar
-
-A [Probot](https://github.com/probot/probot) app that reads events from issues and adds them to a Google Calendar. Created for use within [Campus Experts](https://githubcampus.expert/).
+<div align="center">
+  <img alt="Campus Expert Calendar logo" src="https://avatars2.githubusercontent.com/in/9896?s=88&v=4">
+  <h3><a href="https://github.com/apps/campus-expert-calendar">Campus Expert Calendar</a></h3>
+  <p>A <a href="https://github.com/probot/probot">Probot</a> app that reads events from issues and adds them to a Google Calendar. Created for use within <a href="https://githubcampus.expert/">Campus Experts</a>.</p>
+</div>
 
 ## Use
 
