@@ -10,6 +10,7 @@ const DEFAULT_CONFIG = {
 }
 const GCAL_SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+const APP_USER_ID = process.env.APP_USER_ID
 const GCAL_CLIENT_ID = process.env.GCAL_CLIENT_ID
 const GCAL_CLIENT_SECRET = process.env.GCAL_CLIENT_SECRET
 const GCAL_REDIRECT_URL = process.env.GCAL_REDIRECT_URL
@@ -26,7 +27,7 @@ module.exports = (robot) => {
       context.github.issues.create({
         owner: repo.full_name.split('/')[0],
         repo: repo.name,
-        title: '[Campus Expert Calendar] Configuration needed!',
+        title: '[Campus Expert Calendar] Configuration Needed',
         body: `🎉 Thank you for installing Campus Expert Calendar! Before it will work, you'll need to do a bit of setup...\n\nPlease visit [this page](${authUrl}), accept the permissions, then comment on this issue with the code it generates.`,
         assignee: context.payload.sender.login
       })
@@ -35,8 +36,16 @@ module.exports = (robot) => {
 
   // on issue comment, get tokens
   robot.on('issue_comment.created', async context => {
-    if (context.payload.issue.title != '[Campus Expert Calendar] Configuration needed!') return false
-    // TODO: check it is an issue by this bot
+    if (context.payload.issue.title != '[Campus Expert Calendar] Configuration Needed') return false
+    if (context.payload.issue.user.id != APP_USER_ID) return false
+
+    const commentsResponse = await context.github.issues.getComments(context.issue())
+    const comments = commentsResponse.data
+    for (let comment of comments) {
+      if (comment.body.startsWith('🌟') && comment.user.id == APP_USER_ID) {
+        return false
+      }
+    }
 
     const oauth2Client = new OAuth2Client(GCAL_CLIENT_ID, GCAL_CLIENT_SECRET, GCAL_REDIRECT_URL)
 
@@ -113,6 +122,8 @@ module.exports = (robot) => {
   robot.on('issues.edited', context => {
     const issueId = context.payload.issue.id
     const issueTitle = context.payload.issue.title
+
+    // TODO: change date of event on edit
   })
 }
 
