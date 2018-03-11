@@ -1,7 +1,7 @@
 const moment = require('moment')
 const { google } = require('googleapis')
 const { OAuth2Client } = require('google-auth-library')
-const CryptoJS = require("crypto-js")
+const CryptoJS = require('crypto-js')
 const AES = CryptoJS.AES
 
 const DEFAULT_CONFIG = {
@@ -36,13 +36,13 @@ module.exports = (robot) => {
 
   // on issue comment, get tokens
   robot.on('issue_comment.created', async context => {
-    if (context.payload.issue.title != '[Campus Expert Calendar] Configuration Needed') return false
-    if (context.payload.issue.user.id != APP_USER_ID) return false
+    if (context.payload.issue.title !== '[Campus Expert Calendar] Configuration Needed') return false
+    if (context.payload.issue.user.id !== APP_USER_ID) return false
 
     const commentsResponse = await context.github.issues.getComments(context.issue())
     const comments = commentsResponse.data
     for (let comment of comments) {
-      if (comment.body.startsWith('🌟') && comment.user.id == APP_USER_ID) {
+      if (comment.body.startsWith('🌟') && comment.user.id === APP_USER_ID) {
         return false
       }
     }
@@ -79,13 +79,12 @@ module.exports = (robot) => {
     robot.log(credentials)
     oauth2Client.setCredentials(credentials)
 
-    const issueId = context.payload.issue.id
     const issueTitle = context.payload.issue.title
     const issueBody = context.payload.issue.body
     const issueUrl = context.payload.issue.html_url
 
     const dateMatches = issueTitle.match(config.regex)
-    if (!dateMatches || dateMatches.length == 0) {
+    if (!dateMatches || dateMatches.length === 0) {
       // TODO: post a comment on issue asking for correct format if event label is set
       robot.log.info(`No matches for date regex on issue: ${issueTitle}`)
       return false
@@ -99,7 +98,7 @@ module.exports = (robot) => {
 
     const calendar = google.calendar('v3')
 
-    let event = {
+    const event = {
       summary: issueTitle.replace(new RegExp(config.regex), ''),
       description: `${issueUrl}\n\n${issueBody}`,
       start: {
@@ -110,18 +109,18 @@ module.exports = (robot) => {
       }
     }
 
-    event = await calendar.events.insert({
+    await calendar.events.insert({
       auth: oauth2Client,
       calendarId: config.gcal_calendar,
-      resource: event,
+      resource: event
     })
 
     robot.log.info('Event added to calendar!')
   })
 
   robot.on('issues.edited', context => {
-    const issueId = context.payload.issue.id
-    const issueTitle = context.payload.issue.title
+    // const issueId = context.payload.issue.id
+    // const issueTitle = context.payload.issue.title
 
     // TODO: change date of event on edit
   })
