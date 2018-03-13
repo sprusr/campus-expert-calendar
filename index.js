@@ -73,16 +73,21 @@ module.exports = (robot) => {
       return false
     }
 
-    const oauth2Client = new OAuth2Client(GCAL_CLIENT_ID, GCAL_CLIENT_SECRET, GCAL_REDIRECT_URL)
-    const bytes = AES.decrypt(config.gcal_token, GCAL_TOKEN_SECRET)
-    const credentials = JSON.parse(bytes.toString(CryptoJS.enc.Utf8))
-    robot.log(credentials)
-    oauth2Client.setCredentials(credentials)
+    // if event issues should have labels, check if this one does
+    if (config.event_label) {
+      let labeled = false
+      for (let label of context.payload.issue.labels) {
+        if (label.name === config.event_label) labeled = true
+      }
+      if (!labeled) return false
+    }
 
+    // issue info in nice handy variables
     const issueTitle = context.payload.issue.title
     const issueBody = context.payload.issue.body
     const issueUrl = context.payload.issue.html_url
 
+    // does issue title match with our regex
     const dateMatches = issueTitle.match(config.regex)
     if (!dateMatches || dateMatches.length === 0) {
       // TODO: post a comment on issue asking for correct format if event label is set
@@ -90,14 +95,21 @@ module.exports = (robot) => {
       return false
     }
 
+    // does matched date string parse correctly
     const issueDate = moment(dateMatches[0], config.format)
     if (!issueDate.isValid()) {
       robot.log.warn('Unable to parse date.')
       return false
     }
 
+    // set up our gcal api client
+    const oauth2Client = new OAuth2Client(GCAL_CLIENT_ID, GCAL_CLIENT_SECRET, GCAL_REDIRECT_URL)
+    const bytes = AES.decrypt(config.gcal_token, GCAL_TOKEN_SECRET)
+    const credentials = JSON.parse(bytes.toString(CryptoJS.enc.Utf8))
+    oauth2Client.setCredentials(credentials)
     const calendar = google.calendar('v3')
 
+    // create the event json and insert an event
     const event = {
       summary: issueTitle.replace(new RegExp(config.regex), ''),
       description: `${issueUrl}\n\n${issueBody}`,
@@ -108,7 +120,6 @@ module.exports = (robot) => {
         date: issueDate.format('YYYY-MM-DD')
       }
     }
-
     await calendar.events.insert({
       auth: oauth2Client,
       calendarId: config.gcal_calendar,
@@ -118,6 +129,35 @@ module.exports = (robot) => {
     robot.log.info('Event added to calendar!')
   })
 
+  // on label add, if we require event label, add event to calendar
+  robot.on('issues.labeled', context => {
+    if (!config.event_label) {
+      return false
+    }
+
+    console.log(context.payload)
+
+    // TODO
+    // if event not already in calendar
+    // and label added was event label
+    // add to calendar
+  })
+
+  // on label add, if we require event label, add event to calendar
+  robot.on('issues.unlabeled', context => {
+    if (!config.event_label) {
+      return false
+    }
+
+    console.log(context.payload)
+
+    // TODO
+    // if event not already in calendar
+    // and label added was event label
+    // add to calendar
+  })
+
+  // if already in calendar, update, otherwise if now applicable, add to calendar
   robot.on('issues.edited', context => {
     // const issueId = context.payload.issue.id
     // const issueTitle = context.payload.issue.title

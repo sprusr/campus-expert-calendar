@@ -20,6 +20,7 @@ regex: \d{4}-\d{2}-\d{2}$ # regex to match date in title
 format: YYYY-MM-DD # format of the above, for use with moment.js
 gcal_calendar: id_goes_here # instructions in issue posted when app is added to repo
 gcal_token: encrypted_token_here # same here
+event_label: event # if you only want event issues with a certain label added to the calendar
 ```
 
 ## Developers
