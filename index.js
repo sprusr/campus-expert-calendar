@@ -39,6 +39,7 @@ module.exports = (robot) => {
     if (context.payload.issue.title !== '[Campus Expert Calendar] Configuration Needed') return false
     if (context.payload.issue.user.id !== APP_USER_ID) return false
 
+    // if we already gave a code, don't do it again
     const commentsResponse = await context.github.issues.getComments(context.issue())
     const comments = commentsResponse.data
     for (let comment of comments) {
@@ -47,12 +48,10 @@ module.exports = (robot) => {
       }
     }
 
-    const oauth2Client = new OAuth2Client(GCAL_CLIENT_ID, GCAL_CLIENT_SECRET, GCAL_REDIRECT_URL)
-
     // get the tokens and encrypt
+    const oauth2Client = new OAuth2Client(GCAL_CLIENT_ID, GCAL_CLIENT_SECRET, GCAL_REDIRECT_URL)
     const tokensResponse = await oauth2Client.getToken(context.payload.comment.body)
     const tokens = tokensResponse.tokens
-    robot.log(tokens)
     const tokensString = JSON.stringify(tokens)
     const encryptedTokens = AES.encrypt(tokensString, GCAL_TOKEN_SECRET).toString()
 
@@ -103,10 +102,7 @@ module.exports = (robot) => {
     }
 
     // set up our gcal api client
-    const oauth2Client = new OAuth2Client(GCAL_CLIENT_ID, GCAL_CLIENT_SECRET, GCAL_REDIRECT_URL)
-    const bytes = AES.decrypt(config.gcal_token, GCAL_TOKEN_SECRET)
-    const credentials = JSON.parse(bytes.toString(CryptoJS.enc.Utf8))
-    oauth2Client.setCredentials(credentials)
+    const oauth2Client = getOAuth2Client(config.gcal_token)
     const calendar = google.calendar('v3')
 
     // create the event json and insert an event
@@ -120,27 +116,61 @@ module.exports = (robot) => {
         date: issueDate.format('YYYY-MM-DD')
       }
     }
-    await calendar.events.insert({
+    calendar.events.insert({
       auth: oauth2Client,
       calendarId: config.gcal_calendar,
       resource: event
+    }, (err, res) => {
+      robot.log.info('Event added to calendar!')
     })
-
-    robot.log.info('Event added to calendar!')
   })
 
   // on label add, if we require event label, add event to calendar
-  robot.on('issues.labeled', context => {
-    if (!config.event_label) {
+  robot.on('issues.labeled', async context => {
+    const config = await context.config('calendar.yml', DEFAULT_CONFIG)
+
+    if (!config.event_label || context.payload.label.name !== config.event_label) {
       return false
     }
 
-    console.log(context.payload)
+    // issue info in nice handy variables
+    const issueTitle = context.payload.issue.title
+    const issueUrl = context.payload.issue.html_url
 
-    // TODO
-    // if event not already in calendar
-    // and label added was event label
-    // add to calendar
+    // does issue title match with our regex
+    const dateMatches = issueTitle.match(config.regex)
+    if (!dateMatches || dateMatches.length === 0) {
+      // TODO: post a comment on issue asking for correct format if event label is set
+      robot.log.info(`No matches for date regex on issue: ${issueTitle}`)
+      return false
+    }
+
+    // does matched date string parse correctly
+    const issueDate = moment(dateMatches[0], config.format)
+    if (!issueDate.isValid()) {
+      robot.log.warn('Unable to parse date.')
+      return false
+    }
+
+    // set up our gcal api client
+    const oauth2Client = getOAuth2Client(config.gcal_token)
+
+    // get events and check if this issue is in there
+    const events = await getCalendarEvents({
+      auth: oauth2Client,
+      calendarId: config.gcal_calendar,
+      timeMin: issueDate.startOf('day').toDate(),
+      timeMax: issueDate.endOf('day').toDate()
+    })
+
+    // if the event is already in calendar, don't add it again
+    for (let event of events) {
+      if (event.description.startsWith(issueUrl)) {
+        return false
+      }
+    }
+
+    // TODO add event
   })
 
   // on label add, if we require event label, add event to calendar
@@ -172,4 +202,22 @@ const generateAuthUrl = (oauth2Client) => {
     scope: GCAL_SCOPES
   })
   return authUrl
+}
+
+const getOAuth2Client = (token) => {
+  const oauth2Client = new OAuth2Client(GCAL_CLIENT_ID, GCAL_CLIENT_SECRET, GCAL_REDIRECT_URL)
+  const bytes = AES.decrypt(token, GCAL_TOKEN_SECRET)
+  const credentials = JSON.parse(bytes.toString(CryptoJS.enc.Utf8))
+  oauth2Client.setCredentials(credentials)
+  return oauth2Client
+}
+
+const getCalendarEvents = (params) => {
+  return new Promise(async (resolve, reject) => {
+    const calendar = google.calendar('v3')
+    const events = await calendar.events.list(params, (err, res) => {
+      if (err) return reject(err)
+      return resolve(res.data)
+    })
+  })
 }
